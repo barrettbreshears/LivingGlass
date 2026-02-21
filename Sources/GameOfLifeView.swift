@@ -4,14 +4,13 @@ import MetalKit
 // MARK: - Per-Cell Animation State
 
 struct CellAnim {
-    enum State { case empty, spawning, alive, dying, revealing }
+    enum State { case empty, spawning, alive, dying }
 
     var state: State = .empty
     var progress: CGFloat = 0
     var colorIndex: Int = 0
     var bobPhase: CGFloat = 0
     var age: Int = 0
-    var revealDelay: CGFloat = 0  // staggered delay for reveal animation
 }
 
 // MARK: - Metal-backed Isometric Game of Life View
@@ -46,6 +45,9 @@ class GameOfLifeView: NSView {
     // Grid origin for centering
     var originX: CGFloat = 0
     var originY: CGFloat = 0
+
+    // Bounce effect on space switch
+    var bounceTime: CGFloat = -1  // <0 means no bounce active
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -183,7 +185,21 @@ class GameOfLifeView: NSView {
         }
     }
 
+    /// Global scale multiplier from bounce effect (1.0 = no effect)
+    private var bounceScale: CGFloat {
+        guard bounceTime >= 0 else { return 1.0 }
+        let t = min(bounceTime / 0.5, 1.0)  // 0.5s duration
+        // Quick dip then overshoot back: 1.0 → 0.85 → 1.05 → 1.0
+        let scale = 1.0 + sin(t * .pi * 2) * 0.15 * (1.0 - t)
+        return scale
+    }
+
     private func updateAnimations() {
+        // Advance bounce
+        if bounceTime >= 0 {
+            bounceTime += 1.0 / 60.0
+            if bounceTime > 0.5 { bounceTime = -1 }
+        }
         for x in 0..<engine.width {
             for y in 0..<engine.height {
                 switch anims[x][y].state {
@@ -202,17 +218,6 @@ class GameOfLifeView: NSView {
                         anims[x][y].state = .empty
                         anims[x][y].progress = 0
                     }
-                case .revealing:
-                    if anims[x][y].revealDelay > 0 {
-                        anims[x][y].revealDelay -= 1.0 / 60.0
-                    } else {
-                        anims[x][y].progress += 0.025
-                        if anims[x][y].progress >= 1.0 {
-                            anims[x][y].state = .alive
-                            anims[x][y].progress = 0
-                            anims[x][y].age = 0
-                        }
-                    }
                 case .empty:
                     break
                 }
@@ -229,6 +234,7 @@ class GameOfLifeView: NSView {
         let halfH = tileH / 2
         let w = engine.width, h = engine.height
         let palette = MetalRenderer.faceColors
+        let bScale = Float(bounceScale)
 
         // Use view coordinates consistently (shader maps to NDC via viewportSize)
         renderer.viewportSize = SIMD2<Float>(Float(bounds.width), Float(bounds.height))
@@ -252,10 +258,8 @@ class GameOfLifeView: NSView {
                 let faces = palette[anim.colorIndex]
 
                 switch anim.state {
-                case .spawning, .revealing:
+                case .spawning:
                     let t = anim.progress
-                    // Revealing cubes wait for their delay, show nothing until progress > 0
-                    if anim.state == .revealing && anim.revealDelay > 0 { continue }
                     let eased = easeOutBack(t)
                     let scale = max(eased, 0.01)
                     let cubeH = Float(maxCubeH * scale)
@@ -265,7 +269,7 @@ class GameOfLifeView: NSView {
                     let py = Float(baseSY)
 
                     instances.append(CubeInstance(
-                        posHeightScale: SIMD4<Float>(px, py, cubeH, Float(scale * tileW)),
+                        posHeightScale: SIMD4<Float>(px, py, cubeH * bScale, Float(scale * tileW) * bScale),
                         topColor: SIMD4<Float>(faces.top, alpha),
                         leftColor: SIMD4<Float>(faces.left, depth),
                         rightColor: SIMD4<Float>(faces.right, 0)
@@ -293,7 +297,7 @@ class GameOfLifeView: NSView {
                                              min(faces.right.z * bright, 1))
 
                     instances.append(CubeInstance(
-                        posHeightScale: SIMD4<Float>(px, py, cubeH, Float(tileW)),
+                        posHeightScale: SIMD4<Float>(px, py, cubeH * bScale, Float(tileW) * bScale),
                         topColor: SIMD4<Float>(top, 1.0),
                         leftColor: SIMD4<Float>(left, depth),
                         rightColor: SIMD4<Float>(right, 0)
@@ -325,7 +329,7 @@ class GameOfLifeView: NSView {
                                                   faces.right.z * (1 - vf * 0.3))
 
                         instances.append(CubeInstance(
-                            posHeightScale: SIMD4<Float>(px, py, Float(maxCubeH), Float(tileW)),
+                            posHeightScale: SIMD4<Float>(px, py, Float(maxCubeH) * bScale, Float(tileW) * bScale),
                             topColor: SIMD4<Float>(top, 1.0),
                             leftColor: SIMD4<Float>(left, depth),
                             rightColor: SIMD4<Float>(right, 0)
@@ -351,7 +355,7 @@ class GameOfLifeView: NSView {
                         let right = SIMD3<Float>(faces.right.x * (1 - ef), faces.right.y * (1 - ef), faces.right.z * (1 - ef))
 
                         instances.append(CubeInstance(
-                            posHeightScale: SIMD4<Float>(px, py, cubeH, Float(tileW * shrink)),
+                            posHeightScale: SIMD4<Float>(px, py, cubeH * bScale, Float(tileW * shrink) * bScale),
                             topColor: SIMD4<Float>(top, alpha),
                             leftColor: SIMD4<Float>(left, depth),
                             rightColor: SIMD4<Float>(right, 0)
@@ -382,24 +386,8 @@ class GameOfLifeView: NSView {
 
     // MARK: - Control
 
-    func triggerReveal() {
-        let cx = CGFloat(engine.width) / 2
-        let cy = CGFloat(engine.height) / 2
-        let maxDist = sqrt(cx * cx + cy * cy)
-
-        for x in 0..<engine.width {
-            for y in 0..<engine.height {
-                if anims[x][y].state == .alive || anims[x][y].state == .spawning {
-                    let dx = CGFloat(x) - cx
-                    let dy = CGFloat(y) - cy
-                    let dist = sqrt(dx * dx + dy * dy)
-                    // Stagger: center cubes appear first, edges last
-                    anims[x][y].state = .revealing
-                    anims[x][y].progress = 0
-                    anims[x][y].revealDelay = (dist / maxDist) * 0.8  // 0–0.8s delay
-                }
-            }
-        }
+    func triggerBounce() {
+        bounceTime = 0
     }
 
     func reset() {

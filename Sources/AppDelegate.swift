@@ -117,7 +117,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func spaceChanged() {
         for window in windows {
             if let view = window.contentView as? GameOfLifeView {
-                view.triggerReveal()
+                view.triggerBounce()
             }
         }
     }

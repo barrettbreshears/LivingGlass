@@ -35,7 +35,7 @@ class GameOfLifeView: NSView {
     // Render loop
     var displayTimer: Timer?
     var frameCount: Int = 0
-    let gameTickEvery = 60          // game steps every 60 render frames (~1/sec at 60fps)
+    let gameTickEvery = 180         // game steps every 180 render frames (~1 per 3sec at 60fps)
     var globalTime: CGFloat = 0
 
     // Precomputed

@@ -31,10 +31,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         pauseMenuItem = NSMenuItem(title: "Pause", action: #selector(togglePause), keyEquivalent: "p")
+        pauseMenuItem.target = self
         menu.addItem(pauseMenuItem)
-        menu.addItem(NSMenuItem(title: "Reset", action: #selector(resetAll), keyEquivalent: "r"))
+        let resetItem = NSMenuItem(title: "Reset", action: #selector(resetAll), keyEquivalent: "r")
+        resetItem.target = self
+        menu.addItem(resetItem)
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit LivingGlass", action: #selector(quit), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: "Quit LivingGlass", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
         statusItem.menu = menu
 
         // Create a window for each screen
@@ -88,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func resetAll() {
         for window in windows {
             if let view = window.contentView as? GameOfLifeView {
-                view.engine.randomize()
+                view.reset()
             }
         }
     }

@@ -377,6 +377,24 @@ class GameOfLifeView: NSView {
 
     // MARK: - Control
 
+    func reset() {
+        engine.randomize()
+        // Re-sync animation state
+        for x in 0..<engine.width {
+            for y in 0..<engine.height {
+                if engine.cells[x][y].alive {
+                    anims[x][y].state = .alive
+                    anims[x][y].colorIndex = engine.cells[x][y].colorIndex
+                    anims[x][y].bobPhase = CGFloat.random(in: 0...(.pi * 2))
+                    anims[x][y].age = 0
+                } else {
+                    anims[x][y].state = .empty
+                }
+            }
+        }
+        needsDisplay = true
+    }
+
     func pause() {
         displayTimer?.invalidate()
         displayTimer = nil

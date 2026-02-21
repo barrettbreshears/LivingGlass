@@ -4,20 +4,22 @@ import MetalKit
 
 class LivingGlassView: ScreenSaverView {
     private var gameView: GameOfLifeView?
+    private var didSetup = false
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
         animationTimeInterval = 1.0 / 60.0
-        setup()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         animationTimeInterval = 1.0 / 60.0
-        setup()
     }
 
-    private func setup() {
+    private func setupIfNeeded() {
+        guard !didSetup, bounds.width > 0, bounds.height > 0 else { return }
+        didSetup = true
+
         wantsLayer = true
         layer?.backgroundColor = NSColor(hex: 0x121117).cgColor
 
@@ -30,6 +32,7 @@ class LivingGlassView: ScreenSaverView {
 
     override func startAnimation() {
         super.startAnimation()
+        setupIfNeeded()
         gameView?.resume()
     }
 
@@ -39,13 +42,22 @@ class LivingGlassView: ScreenSaverView {
     }
 
     override func animateOneFrame() {
-        // GameOfLifeView drives its own timer, so nothing needed here
+        setupIfNeeded()
+    }
+
+    override func resize(withOldSuperviewSize oldSize: NSSize) {
+        super.resize(withOldSuperviewSize: oldSize)
+        gameView?.frame = bounds
+        if bounds.width > 0 && bounds.height > 0 {
+            gameView?.resize(to: bounds.size)
+        }
     }
 
     override var hasConfigureSheet: Bool { false }
     override var configureSheet: NSWindow? { nil }
 
     override func draw(_ rect: NSRect) {
-        // Let the Metal subview handle all drawing
+        NSColor(hex: 0x121117).setFill()
+        rect.fill()
     }
 }

@@ -54,30 +54,21 @@ class GameOfLifeView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        setup()
+        setup(bundle: Bundle.main)
     }
 
-    convenience init(frame: NSRect, bundle: Bundle) {
-        self.init(frame: frame)
-        // Re-init renderer with correct bundle if needed
-        if bundle != Bundle.main {
-            resourceBundle = bundle
-            renderer = MetalRenderer(mtkView: mtkView, bundle: bundle)
-            mtkView.delegate = renderer
-            if let renderer = renderer {
-                renderer.mtkView(mtkView, drawableSizeWillChange: mtkView.drawableSize)
-            }
-            renderer?.tileW = Float(tileW)
-            renderer?.tileH = Float(tileH)
-        }
+    init(frame: NSRect, bundle: Bundle) {
+        super.init(frame: frame)
+        setup(bundle: bundle)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        setup()
+        setup(bundle: Bundle.main)
     }
 
-    private func setup() {
+    private func setup(bundle: Bundle) {
+        resourceBundle = bundle
         wantsLayer = true
 
         // Create MTKView
@@ -91,7 +82,7 @@ class GameOfLifeView: NSView {
 
         addSubview(mtkView)
 
-        renderer = MetalRenderer(mtkView: mtkView)
+        renderer = MetalRenderer(mtkView: mtkView, bundle: bundle)
         mtkView.delegate = renderer
 
         // Trigger initial size

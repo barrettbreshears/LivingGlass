@@ -71,6 +71,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.backgroundColor = NSColor(hex: 0x121117)
+        window.hidesOnDeactivate = false
+        window.canHide = false
 
         let lifeView = GameOfLifeView(frame: screen.frame)
         window.contentView = lifeView

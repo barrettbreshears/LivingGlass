@@ -71,6 +71,16 @@ open "build/LivingGlass.app"
 cp -r "build/LivingGlass.app" /Applications/
 ```
 
+### Screen saver (lock screen)
+
+The build also produces `LivingGlass.saver` — same visuals on your lock screen and screen saver:
+
+```bash
+open "build/LivingGlass.saver"
+```
+
+Then: System Settings → Screen Saver → select **LivingGlass**
+
 ### Start on login
 
 System Settings → General → Login Items → **+** → select LivingGlass

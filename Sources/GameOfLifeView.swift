@@ -66,6 +66,13 @@ class GameOfLifeView: NSView {
         mtkView.clearColor = MTLClearColor(red: 0x12/255.0, green: 0x11/255.0, blue: 0x17/255.0, alpha: 1)
         mtkView.isPaused = true           // We drive rendering manually
         mtkView.enableSetNeedsDisplay = false
+        mtkView.framebufferOnly = true
+
+        // Sync frame presentation with compositor to prevent flash on space switch
+        if let metalLayer = mtkView.layer as? CAMetalLayer {
+            metalLayer.presentsWithTransaction = true
+        }
+
         addSubview(mtkView)
 
         renderer = MetalRenderer(mtkView: mtkView)

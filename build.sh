@@ -49,10 +49,48 @@ elif [ -d icon.iconset ]; then
 fi
 
 echo "Built: ${BUNDLE_DIR}"
+
+# Build screen saver
 echo ""
-echo "To run:  open \"${BUNDLE_DIR}\""
-echo "To install: cp -r \"${BUNDLE_DIR}\" /Applications/"
+echo "Building LivingGlass Screen Saver..."
+
+SAVER_DIR="build/LivingGlass.saver"
+SAVER_CONTENTS="${SAVER_DIR}/Contents"
+SAVER_MACOS="${SAVER_CONTENTS}/MacOS"
+SAVER_RESOURCES="${SAVER_CONTENTS}/Resources"
+mkdir -p "${SAVER_MACOS}" "${SAVER_RESOURCES}"
+
+# Compile screen saver bundle (shared sources + screen saver entry point)
+swiftc \
+    -O \
+    -o "${SAVER_MACOS}/LivingGlass" \
+    -framework AppKit \
+    -framework Metal \
+    -framework MetalKit \
+    -framework ScreenSaver \
+    -emit-library \
+    -module-name LivingGlass \
+    Sources/GameEngine.swift \
+    Sources/MetalRenderer.swift \
+    Sources/GameOfLifeView.swift \
+    ScreenSaver/LivingGlassView.swift
+
+# Copy resources
+cp ScreenSaver/Info.plist "${SAVER_CONTENTS}/Info.plist"
+cp "${RESOURCES_DIR}/default.metallib" "${SAVER_RESOURCES}/default.metallib"
+
+echo "Built: ${SAVER_DIR}"
 echo ""
-echo "To auto-start on login:"
-echo "  1. Open System Settings > General > Login Items"
-echo "  2. Add 'LivingGlass' under 'Open at Login'"
+echo "=== Install ==="
+echo ""
+echo "Wallpaper app:"
+echo "  open \"${BUNDLE_DIR}\""
+echo "  cp -r \"${BUNDLE_DIR}\" /Applications/"
+echo ""
+echo "Screen saver (lock screen):"
+echo "  open \"${SAVER_DIR}\""
+echo "  # or: cp -r \"${SAVER_DIR}\" ~/Library/Screen\\ Savers/"
+echo "  # Then: System Settings → Screen Saver → select LivingGlass"
+echo ""
+echo "Auto-start wallpaper on login:"
+echo "  System Settings → General → Login Items → add LivingGlass"

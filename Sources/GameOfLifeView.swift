@@ -4,13 +4,14 @@ import MetalKit
 // MARK: - Per-Cell Animation State
 
 struct CellAnim {
-    enum State { case empty, spawning, alive, dying }
+    enum State { case empty, spawning, alive, dying, revealing }
 
     var state: State = .empty
     var progress: CGFloat = 0
     var colorIndex: Int = 0
     var bobPhase: CGFloat = 0
     var age: Int = 0
+    var revealDelay: CGFloat = 0  // staggered delay for reveal animation
 }
 
 // MARK: - Metal-backed Isometric Game of Life View
@@ -201,6 +202,17 @@ class GameOfLifeView: NSView {
                         anims[x][y].state = .empty
                         anims[x][y].progress = 0
                     }
+                case .revealing:
+                    if anims[x][y].revealDelay > 0 {
+                        anims[x][y].revealDelay -= 1.0 / 60.0
+                    } else {
+                        anims[x][y].progress += 0.025
+                        if anims[x][y].progress >= 1.0 {
+                            anims[x][y].state = .alive
+                            anims[x][y].progress = 0
+                            anims[x][y].age = 0
+                        }
+                    }
                 case .empty:
                     break
                 }
@@ -240,8 +252,10 @@ class GameOfLifeView: NSView {
                 let faces = palette[anim.colorIndex]
 
                 switch anim.state {
-                case .spawning:
+                case .spawning, .revealing:
                     let t = anim.progress
+                    // Revealing cubes wait for their delay, show nothing until progress > 0
+                    if anim.state == .revealing && anim.revealDelay > 0 { continue }
                     let eased = easeOutBack(t)
                     let scale = max(eased, 0.01)
                     let cubeH = Float(maxCubeH * scale)
@@ -367,6 +381,26 @@ class GameOfLifeView: NSView {
     }
 
     // MARK: - Control
+
+    func triggerReveal() {
+        let cx = CGFloat(engine.width) / 2
+        let cy = CGFloat(engine.height) / 2
+        let maxDist = sqrt(cx * cx + cy * cy)
+
+        for x in 0..<engine.width {
+            for y in 0..<engine.height {
+                if anims[x][y].state == .alive || anims[x][y].state == .spawning {
+                    let dx = CGFloat(x) - cx
+                    let dy = CGFloat(y) - cy
+                    let dist = sqrt(dx * dx + dy * dy)
+                    // Stagger: center cubes appear first, edges last
+                    anims[x][y].state = .revealing
+                    anims[x][y].progress = 0
+                    anims[x][y].revealDelay = (dist / maxDist) * 0.8  // 0–0.8s delay
+                }
+            }
+        }
+    }
 
     func reset() {
         engine.randomize()

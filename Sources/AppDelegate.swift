@@ -58,6 +58,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        // Watch for space switches — trigger reveal animation
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(spaceChanged),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
     }
 
     private func createWindow(for screen: NSScreen) {
@@ -102,6 +110,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         for window in windows {
             if let view = window.contentView as? GameOfLifeView {
                 view.reset()
+            }
+        }
+    }
+
+    @objc func spaceChanged() {
+        for window in windows {
+            if let view = window.contentView as? GameOfLifeView {
+                view.triggerReveal()
             }
         }
     }

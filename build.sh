@@ -29,9 +29,11 @@ swiftc \
     -framework AppKit \
     -framework Metal \
     -framework MetalKit \
+    -framework SwiftUI \
     Sources/GameEngine.swift \
     Sources/MetalRenderer.swift \
     Sources/GameOfLifeView.swift \
+    Sources/Preferences.swift \
     Sources/AppDelegate.swift \
     Sources/main.swift
 

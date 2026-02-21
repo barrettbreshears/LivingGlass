@@ -79,10 +79,10 @@ System Settings → General → Login Items → **+** → select LivingGlass
 
 Tweak constants in `Sources/GameOfLifeView.swift`:
 
-| Constant | Default | What it does |
-|----------|---------|-------------|
-| `targetTilesAcross` | `20` | Tiles spanning screen width. Lower = bigger cubes |
-| `gameTickEvery` | `120` | Frames between game steps (120 = 2s at 60fps) |
+| Constant            | Default | What it does                                      |
+| ------------------- | ------- | ------------------------------------------------- |
+| `targetTilesAcross` | `20`    | Tiles spanning screen width. Lower = bigger cubes |
+| `gameTickEvery`     | `120`   | Frames between game steps (120 = 2s at 60fps)     |
 
 ## Requirements
 

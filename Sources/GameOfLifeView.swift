@@ -241,15 +241,18 @@ class GameOfLifeView: NSView {
     private func drawSpawning(ctx: CGContext, sx: CGFloat, sy: CGFloat, anim: CellAnim, faces: CubeFaces) {
         let t = anim.progress
         let eased = easeOutBack(t)
+        let scale = max(eased, 0.01)
 
-        // Cube rises from below and grows to full height
-        let cubeH = maxCubeH * max(eased, 0)
-        let riseOffset = (1.0 - t) * maxCubeH * 1.5  // starts below, rises to position
+        // Cube expands in place from nothing to full size
+        let cubeH = maxCubeH * scale
+        let scaledTileW = tileW * scale
+        let scaledTileH = tileH * scale
         let alpha = min(t * 2.5, 1.0)
 
         ctx.saveGState()
         ctx.setAlpha(alpha)
-        drawCube(ctx: ctx, sx: sx, sy: sy - riseOffset, cubeH: cubeH, faces: faces)
+        drawCubeScaled(ctx: ctx, sx: sx, sy: sy, cubeH: cubeH,
+                       halfW: scaledTileW / 2, halfH: scaledTileH / 2, faces: faces)
         ctx.restoreGState()
     }
 
@@ -301,6 +304,42 @@ class GameOfLifeView: NSView {
     }
 
     // MARK: - Cube Drawing
+
+    private func drawCubeScaled(ctx: CGContext, sx: CGFloat, sy: CGFloat, cubeH: CGFloat,
+                                halfW: CGFloat, halfH: CGFloat, faces: CubeFaces) {
+        guard cubeH > 0.5 else { return }
+
+        let topN = CGPoint(x: sx, y: sy + halfH + cubeH)
+        let topE = CGPoint(x: sx + halfW, y: sy + cubeH)
+        let topS = CGPoint(x: sx, y: sy - halfH + cubeH)
+        let topW = CGPoint(x: sx - halfW, y: sy + cubeH)
+
+        let botS = CGPoint(x: sx, y: sy - halfH)
+        let botE = CGPoint(x: sx + halfW, y: sy)
+        let botW = CGPoint(x: sx - halfW, y: sy)
+
+        ctx.setFillColor(red: faces.leftR, green: faces.leftG, blue: faces.leftB, alpha: 1)
+        ctx.beginPath()
+        ctx.move(to: topW); ctx.addLine(to: topS); ctx.addLine(to: botS); ctx.addLine(to: botW)
+        ctx.closePath(); ctx.fillPath()
+
+        ctx.setFillColor(red: faces.rightR, green: faces.rightG, blue: faces.rightB, alpha: 1)
+        ctx.beginPath()
+        ctx.move(to: topS); ctx.addLine(to: topE); ctx.addLine(to: botE); ctx.addLine(to: botS)
+        ctx.closePath(); ctx.fillPath()
+
+        ctx.setFillColor(red: faces.topR, green: faces.topG, blue: faces.topB, alpha: 1)
+        ctx.beginPath()
+        ctx.move(to: topN); ctx.addLine(to: topE); ctx.addLine(to: topS); ctx.addLine(to: topW)
+        ctx.closePath(); ctx.fillPath()
+
+        ctx.setStrokeColor(red: min(faces.topR + 0.15, 1), green: min(faces.topG + 0.15, 1),
+                           blue: min(faces.topB + 0.15, 1), alpha: 0.4)
+        ctx.setLineWidth(max(halfW / 20.0, 0.5))
+        ctx.beginPath()
+        ctx.move(to: topW); ctx.addLine(to: topN); ctx.addLine(to: topE)
+        ctx.strokePath()
+    }
 
     private func drawCube(ctx: CGContext, sx: CGFloat, sy: CGFloat, cubeH: CGFloat, faces: CubeFaces) {
         let halfW = tileW / 2

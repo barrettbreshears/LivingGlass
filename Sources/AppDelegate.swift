@@ -1,10 +1,26 @@
 import AppKit
+import IOKit.ps
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var windows: [NSWindow] = []
     var statusItem: NSStatusItem!
+    var powerTimer: Timer?
+    var isPaused = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Poll power state every 30s
+        powerTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.checkPowerState()
+        }
+        checkPowerState()
+
+        // Instant response to Low Power Mode toggle
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(powerStateChanged),
+            name: NSNotification.Name.NSProcessInfoPowerStateDidChange,
+            object: nil
+        )
         // Menu bar icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
@@ -73,7 +89,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc func powerStateChanged() {
+        checkPowerState()
+    }
+
+    // MARK: - Low Power Mode Detection
+
+    private func checkPowerState() {
+        let isLowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        if isLowPower && !isPaused {
+            pause()
+        } else if !isLowPower && isPaused {
+            resume()
+        }
+    }
+
+    private func pause() {
+        isPaused = true
+        for window in windows {
+            if let view = window.contentView as? GameOfLifeView {
+                view.pause()
+            }
+        }
+    }
+
+    private func resume() {
+        isPaused = false
+        for window in windows {
+            if let view = window.contentView as? GameOfLifeView {
+                view.resume()
+            }
+        }
+    }
+
     @objc func quit() {
+        powerTimer?.invalidate()
         NSApp.terminate(nil)
     }
 }

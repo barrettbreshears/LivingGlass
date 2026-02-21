@@ -103,6 +103,19 @@ class GameOfLifeView: NSView {
         }
     }
 
+    func pause() {
+        timer?.invalidate()
+        timer = nil
+        // Freeze on current frame — no redraw needed
+    }
+
+    func resume() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+    }
+
     func resize(to size: NSSize) {
         let cols = Int(size.width / cellSize)
         let rows = Int(size.height / cellSize)

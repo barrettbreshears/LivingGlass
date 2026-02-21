@@ -23,10 +23,10 @@ struct CubeFaces {
 // MARK: - Isometric Game of Life View
 
 class GameOfLifeView: NSView {
-    // Isometric geometry
-    let tileW: CGFloat = 18
-    let tileH: CGFloat = 9
-    let maxCubeH: CGFloat = 14
+    // Isometric geometry (2x size)
+    let tileW: CGFloat = 36
+    let tileH: CGFloat = 18
+    let maxCubeH: CGFloat = 28
 
     // Grid & animation
     var engine: GameEngine!
@@ -35,7 +35,7 @@ class GameOfLifeView: NSView {
     // Render loop
     var displayTimer: Timer?
     var frameCount: Int = 0
-    let gameTickEvery = 6           // game steps every 6 render frames (~10/sec at 60fps)
+    let gameTickEvery = 60          // game steps every 60 render frames (~1/sec at 60fps)
     var globalTime: CGFloat = 0
 
     // Precomputed
@@ -100,11 +100,11 @@ class GameOfLifeView: NSView {
         engine = GameEngine(width: gridSize, height: gridSize)
         anims = Array(repeating: Array(repeating: CellAnim(), count: gridSize), count: gridSize)
 
-        // Center the grid
+        // Center the grid (macOS Y-up: grid extends downward in -Y from origin)
         let w = gridSize, h = gridSize
         originX = bounds.midX - CGFloat(w - h) * halfW / 2
         let visualHeight = CGFloat(w + h) * halfH + maxCubeH + halfH
-        originY = bounds.midY - visualHeight / 2 + maxCubeH + halfH
+        originY = bounds.midY + visualHeight / 2
 
         // Sync initial engine state to animation
         for x in 0..<gridSize {
@@ -167,7 +167,7 @@ class GameOfLifeView: NSView {
             for y in 0..<engine.height {
                 switch anims[x][y].state {
                 case .spawning:
-                    anims[x][y].progress += 0.055
+                    anims[x][y].progress += 0.0055
                     if anims[x][y].progress >= 1.0 {
                         anims[x][y].state = .alive
                         anims[x][y].progress = 0
@@ -176,7 +176,7 @@ class GameOfLifeView: NSView {
                 case .alive:
                     anims[x][y].age += 1
                 case .dying:
-                    anims[x][y].progress += 0.022
+                    anims[x][y].progress += 0.0022
                     if anims[x][y].progress >= 1.0 {
                         anims[x][y].state = .empty
                         anims[x][y].progress = 0
@@ -200,14 +200,14 @@ class GameOfLifeView: NSView {
         let halfH = tileH / 2
         let w = engine.width, h = engine.height
 
-        // Draw back-to-front (increasing y, then increasing x)
-        for y in 0..<h {
-            for x in 0..<w {
+        // Draw back-to-front: in macOS Y-up coords, back = higher Y, so draw decreasing (x+y)
+        for y in stride(from: h - 1, through: 0, by: -1) {
+            for x in stride(from: w - 1, through: 0, by: -1) {
                 let anim = anims[x][y]
                 if anim.state == .empty { continue }
 
                 let sx = originX + CGFloat(x - y) * halfW
-                let sy = originY + CGFloat(x + y) * halfH
+                let sy = originY - CGFloat(x + y) * halfH
                 let faces = Self.faceColors[anim.colorIndex]
 
                 switch anim.state {
@@ -230,21 +230,21 @@ class GameOfLifeView: NSView {
 
         // Cube rises from below and grows to full height
         let cubeH = maxCubeH * max(eased, 0)
-        let riseOffset = (1.0 - t) * 20.0  // starts 20px below, rises to position
+        let riseOffset = (1.0 - t) * 40.0  // starts 40px below, rises to position (doubled for 2x size)
         let alpha = min(t * 2.5, 1.0)
 
         ctx.saveGState()
         ctx.setAlpha(alpha)
-        drawCube(ctx: ctx, sx: sx, sy: sy + riseOffset, cubeH: cubeH, faces: faces)
+        drawCube(ctx: ctx, sx: sx, sy: sy - riseOffset, cubeH: cubeH, faces: faces)
         ctx.restoreGState()
     }
 
     private func drawAlive(ctx: CGContext, sx: CGFloat, sy: CGFloat, anim: CellAnim, faces: CubeFaces) {
-        // Gentle idle bob
-        let bob = sin(globalTime * 1.2 + anim.bobPhase) * 2.0
-        // Subtle breathing (cube height oscillation)
-        let breathe = sin(globalTime * 0.8 + anim.bobPhase * 0.7) * 0.5
-        drawCube(ctx: ctx, sx: sx, sy: sy - bob, cubeH: maxCubeH + breathe, faces: faces)
+        // Gentle idle bob (slowed 10x)
+        let bob = sin(globalTime * 0.12 + anim.bobPhase) * 2.0
+        // Subtle breathing (cube height oscillation, slowed 10x)
+        let breathe = sin(globalTime * 0.08 + anim.bobPhase * 0.7) * 0.5
+        drawCube(ctx: ctx, sx: sx, sy: sy + bob, cubeH: maxCubeH + breathe, faces: faces)
     }
 
     private func drawDying(ctx: CGContext, sx: CGFloat, sy: CGFloat, anim: CellAnim, faces: CubeFaces) {
@@ -271,17 +271,17 @@ class GameOfLifeView: NSView {
             // Phase 2: Fall — cube drops away and fades
             let fallT = (t - 0.35) / 0.65
             let eased = easeInCubic(fallT)
-            let fallDist = eased * 80.0
+            let fallDist = eased * 120.0
             let alpha = 1.0 - eased
             let shrink = 1.0 - eased * 0.4
             let cubeH = maxCubeH * shrink
 
-            // Slight tumble wobble during fall
-            let tumbleX = sin(fallT * 8.0) * (1.0 - fallT) * 2.0
+            // Slight tumble wobble during fall (slowed)
+            let tumbleX = sin(fallT * 0.8) * (1.0 - fallT) * 3.0
 
             ctx.saveGState()
             ctx.setAlpha(alpha)
-            drawCube(ctx: ctx, sx: sx + tumbleX, sy: sy + fallDist, cubeH: cubeH, faces: faces)
+            drawCube(ctx: ctx, sx: sx + tumbleX, sy: sy - fallDist, cubeH: cubeH, faces: faces)
             ctx.restoreGState()
         }
     }
@@ -294,18 +294,18 @@ class GameOfLifeView: NSView {
 
         guard cubeH > 0.5 else { return }
 
-        // Top face (diamond)
-        let topN = CGPoint(x: sx, y: sy - halfH - cubeH)
-        let topE = CGPoint(x: sx + halfW, y: sy - cubeH)
-        let topS = CGPoint(x: sx, y: sy + halfH - cubeH)
-        let topW = CGPoint(x: sx - halfW, y: sy - cubeH)
+        // Top face (diamond) — cubeH extends upward (+Y in macOS coords)
+        let topN = CGPoint(x: sx, y: sy + halfH + cubeH)
+        let topE = CGPoint(x: sx + halfW, y: sy + cubeH)
+        let topS = CGPoint(x: sx, y: sy - halfH + cubeH)
+        let topW = CGPoint(x: sx - halfW, y: sy + cubeH)
 
         // Ground-level vertices
-        let botS = CGPoint(x: sx, y: sy + halfH)
+        let botS = CGPoint(x: sx, y: sy - halfH)
         let botE = CGPoint(x: sx + halfW, y: sy)
         let botW = CGPoint(x: sx - halfW, y: sy)
 
-        // Left face (west side)
+        // Left face (west side — visible below top, going down-left)
         ctx.setFillColor(red: faces.leftR, green: faces.leftG, blue: faces.leftB, alpha: 1)
         ctx.beginPath()
         ctx.move(to: topW)
@@ -315,7 +315,7 @@ class GameOfLifeView: NSView {
         ctx.closePath()
         ctx.fillPath()
 
-        // Right face (east side)
+        // Right face (east side — visible below top, going down-right)
         ctx.setFillColor(red: faces.rightR, green: faces.rightG, blue: faces.rightB, alpha: 1)
         ctx.beginPath()
         ctx.move(to: topS)
@@ -335,10 +335,10 @@ class GameOfLifeView: NSView {
         ctx.closePath()
         ctx.fillPath()
 
-        // Subtle edge highlight on top face (thin bright line along top-left edges)
+        // Subtle edge highlight on top face
         ctx.setStrokeColor(red: min(faces.topR + 0.15, 1), green: min(faces.topG + 0.15, 1),
                            blue: min(faces.topB + 0.15, 1), alpha: 0.4)
-        ctx.setLineWidth(0.5)
+        ctx.setLineWidth(0.8)
         ctx.beginPath()
         ctx.move(to: topW)
         ctx.addLine(to: topN)

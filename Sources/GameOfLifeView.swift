@@ -217,7 +217,7 @@ class GameOfLifeView: NSView {
         let palette = MetalRenderer.faceColors
 
         // Use view coordinates consistently (shader maps to NDC via viewportSize)
-        renderer?.viewportSize = SIMD2<Float>(Float(bounds.width), Float(bounds.height))
+        renderer.viewportSize = SIMD2<Float>(Float(bounds.width), Float(bounds.height))
 
         var instances: [CubeInstance] = []
         instances.reserveCapacity(w * h / 3)  // rough estimate of visible cells

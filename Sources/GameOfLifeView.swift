@@ -68,11 +68,6 @@ class GameOfLifeView: NSView {
         mtkView.enableSetNeedsDisplay = false
         mtkView.framebufferOnly = true
 
-        // Sync frame presentation with compositor to prevent flash on space switch
-        if let metalLayer = mtkView.layer as? CAMetalLayer {
-            metalLayer.presentsWithTransaction = true
-        }
-
         addSubview(mtkView)
 
         renderer = MetalRenderer(mtkView: mtkView)

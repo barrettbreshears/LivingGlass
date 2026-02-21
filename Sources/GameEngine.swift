@@ -21,6 +21,20 @@ struct Cell {
     var jitterY: CGFloat = 0
 }
 
+struct GameDiff {
+    struct Birth {
+        let x: Int
+        let y: Int
+        let colorIndex: Int
+    }
+    struct Death {
+        let x: Int
+        let y: Int
+    }
+    var births: [Birth]
+    var deaths: [Death]
+}
+
 class GameEngine {
     let width: Int
     let height: Int
@@ -113,9 +127,12 @@ class GameEngine {
             ?? Int.random(in: 0..<Self.palette.count)
     }
 
-    func step() {
+    @discardableResult
+    func step() -> GameDiff {
         var next = cells
         var aliveCount = 0
+        var births: [GameDiff.Birth] = []
+        var deaths: [GameDiff.Death] = []
 
         for x in 0..<width {
             for y in 0..<height {
@@ -125,39 +142,26 @@ class GameEngine {
                 if cell.alive {
                     if n < 2 || n > 3 {
                         next[x][y].alive = false
-                        next[x][y].deathFrame = 1
-                        next[x][y].jitterX = CGFloat.random(in: -2...2)
-                        next[x][y].jitterY = CGFloat.random(in: -2...2)
                         next[x][y].age = 0
+                        deaths.append(GameDiff.Death(x: x, y: y))
                     } else {
                         next[x][y].age = min(cell.age + 1, 50)
                         aliveCount += 1
                     }
-                } else {
-                    if n == 3 {
-                        next[x][y].alive = true
-                        next[x][y].age = 0
-                        next[x][y].colorIndex = dominantNeighborColor(x, y)
-                        next[x][y].deathFrame = 0
-                        aliveCount += 1
-                    } else if cell.deathFrame > 0 {
-                        if cell.deathFrame >= maxDeathFrames {
-                            next[x][y].deathFrame = 0
-                        } else {
-                            next[x][y].deathFrame = cell.deathFrame + 1
-                            // Vibration intensity decreases as cell fades
-                            let intensity = 2.5 * (1.0 - CGFloat(cell.deathFrame) / CGFloat(maxDeathFrames))
-                            next[x][y].jitterX = CGFloat.random(in: -intensity...intensity)
-                            next[x][y].jitterY = CGFloat.random(in: -intensity...intensity)
-                        }
-                    }
+                } else if n == 3 {
+                    let color = dominantNeighborColor(x, y)
+                    next[x][y].alive = true
+                    next[x][y].age = 0
+                    next[x][y].colorIndex = color
+                    births.append(GameDiff.Birth(x: x, y: y, colorIndex: color))
+                    aliveCount += 1
                 }
             }
         }
 
         cells = next
 
-        // Stagnation detection: if any board state repeats within the last 100 steps, inject life
+        // Stagnation detection
         let hash = boardHash()
         if recentHashes.contains(hash) {
             injectPattern()
@@ -167,13 +171,25 @@ class GameEngine {
             recentHashes.removeFirst()
         }
 
-        // Also inject if population drops too low
+        // Inject if population too low
         let total = width * height
         if aliveCount < total / 25 {
             for _ in 0..<5 { injectPattern() }
         } else if aliveCount < total / 12 {
             injectPattern()
         }
+
+        return GameDiff(births: births, deaths: deaths)
+    }
+
+    /// Precompute many steps at once. Call from a background thread.
+    func precompute(steps: Int) -> [GameDiff] {
+        var diffs: [GameDiff] = []
+        diffs.reserveCapacity(steps)
+        for _ in 0..<steps {
+            diffs.append(step())
+        }
+        return diffs
     }
 
     private func boardHash() -> Int {

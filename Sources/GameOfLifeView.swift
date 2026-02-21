@@ -31,6 +31,13 @@ class GameOfLifeView: NSView {
     let gameTickEvery = 120
     var globalTime: CGFloat = 0
 
+    // Precomputed game state diffs
+    var diffQueue: [GameDiff] = []
+    let precomputeBatchSize = 1000
+    let refillThreshold = 100
+    var isPrecomputing = false
+    let precomputeQueue = DispatchQueue(label: "com.taigrr.livingglass.precompute", qos: .utility)
+
     // Metal
     var mtkView: MTKView!
     var renderer: MetalRenderer?
@@ -115,6 +122,9 @@ class GameOfLifeView: NSView {
 
         renderer?.tileW = Float(tileW)
         renderer?.tileH = Float(tileH)
+
+        // Precompute initial batch
+        diffQueue = engine.precompute(steps: precomputeBatchSize)
     }
 
     // MARK: - Render Loop
@@ -132,31 +142,40 @@ class GameOfLifeView: NSView {
         globalTime += 1.0 / 60.0
 
         if frameCount % gameTickEvery == 0 {
-            let old = engine.cells
-            engine.step()
-            syncAnimations(old: old)
+            applyNextDiff()
+            refillIfNeeded()
         }
 
         updateAnimations()
         buildAndRender()
     }
 
-    private func syncAnimations(old: [[Cell]]) {
-        for x in 0..<engine.width {
-            for y in 0..<engine.height {
-                let was = old[x][y].alive
-                let now = engine.cells[x][y].alive
+    private func applyNextDiff() {
+        guard !diffQueue.isEmpty else { return }
+        let diff = diffQueue.removeFirst()
 
-                if !was && now {
-                    anims[x][y].state = .spawning
-                    anims[x][y].progress = 0
-                    anims[x][y].colorIndex = engine.cells[x][y].colorIndex
-                    anims[x][y].bobPhase = CGFloat.random(in: 0...(.pi * 2))
-                    anims[x][y].age = 0
-                } else if was && !now {
-                    anims[x][y].state = .dying
-                    anims[x][y].progress = 0
-                }
+        for birth in diff.births {
+            anims[birth.x][birth.y].state = .spawning
+            anims[birth.x][birth.y].progress = 0
+            anims[birth.x][birth.y].colorIndex = birth.colorIndex
+            anims[birth.x][birth.y].bobPhase = CGFloat.random(in: 0...(.pi * 2))
+            anims[birth.x][birth.y].age = 0
+        }
+        for death in diff.deaths {
+            anims[death.x][death.y].state = .dying
+            anims[death.x][death.y].progress = 0
+        }
+    }
+
+    private func refillIfNeeded() {
+        guard diffQueue.count < refillThreshold && !isPrecomputing else { return }
+        isPrecomputing = true
+        precomputeQueue.async { [weak self] in
+            guard let self = self else { return }
+            let diffs = self.engine.precompute(steps: self.precomputeBatchSize)
+            DispatchQueue.main.async {
+                self.diffQueue.append(contentsOf: diffs)
+                self.isPrecomputing = false
             }
         }
     }
@@ -359,6 +378,9 @@ class GameOfLifeView: NSView {
                 }
             }
         }
+        // Precompute fresh batch
+        diffQueue.removeAll()
+        diffQueue = engine.precompute(steps: precomputeBatchSize)
     }
 
     func pause() {

@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Create ZIP archives
+        run: |
+          cd build
+          zip -r LivingGlass-${{ github.ref_name }}.zip LivingGlass.app
+          zip -r LivingGlass-ScreenSaver-${{ github.ref_name }}.zip LivingGlass.saver
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/LivingGlass-${{ github.ref_name }}.zip
+            build/LivingGlass-ScreenSaver-${{ github.ref_name }}.zip
+          generate_release_notes: true

@@ -181,7 +181,7 @@ class GameOfLifeView: NSView {
             for y in 0..<engine.height {
                 switch anims[x][y].state {
                 case .spawning:
-                    anims[x][y].progress += 0.0055
+                    anims[x][y].progress += 0.02
                     if anims[x][y].progress >= 1.0 {
                         anims[x][y].state = .alive
                         anims[x][y].progress = 0
@@ -190,7 +190,7 @@ class GameOfLifeView: NSView {
                 case .alive:
                     anims[x][y].age += 1
                 case .dying:
-                    anims[x][y].progress += 0.0022
+                    anims[x][y].progress += 0.015
                     if anims[x][y].progress >= 1.0 {
                         anims[x][y].state = .empty
                         anims[x][y].progress = 0

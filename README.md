@@ -55,6 +55,7 @@ Requires macOS 14+ and Xcode Command Line Tools:
 
 ```bash
 xcode-select --install
+xcodebuild -downloadComponent MetalToolchain
 ```
 
 ```bash

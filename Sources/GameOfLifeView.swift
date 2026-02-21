@@ -23,10 +23,11 @@ struct CubeFaces {
 // MARK: - Isometric Game of Life View
 
 class GameOfLifeView: NSView {
-    // Isometric geometry (2x size)
-    let tileW: CGFloat = 36
-    let tileH: CGFloat = 18
-    let maxCubeH: CGFloat = 28
+    // Isometric geometry — shallow angle (4:1 ratio), large tiles
+    // Dynamic: computed from screen size in initGrid()
+    var tileW: CGFloat = 72
+    var tileH: CGFloat = 18
+    var maxCubeH: CGFloat = 40
 
     // Grid & animation
     var engine: GameEngine!
@@ -85,25 +86,38 @@ class GameOfLifeView: NSView {
     // MARK: - Grid Setup
 
     private func initGrid() {
+        let screenW = bounds.width
+        let screenH = bounds.height
+
+        // Scale tile size relative to screen — target ~40 tiles across the screen width
+        // This keeps density consistent across resolutions (1080p → 8K)
+        let targetTilesAcross: CGFloat = 40
+        tileW = max(floor(screenW / targetTilesAcross), 24)
+        tileH = floor(tileW / 4)     // shallow isometric angle (4:1 ratio)
+        maxCubeH = floor(tileW * 0.55)
+
         let halfW = tileW / 2
         let halfH = tileH / 2
 
-        // For a square grid of side n, the isometric diamond is:
-        //   width  = 2n * halfW = n * tileW
-        //   height = 2n * halfH + maxCubeH = n * tileH + maxCubeH
-        let n = min(
-            Int(bounds.width / tileW),
-            Int((bounds.height - maxCubeH) / tileH)
-        )
-        let gridSize = max(min(n, 90), 10)
+        // The isometric diamond for an n×n grid has:
+        //   width  = 2n * halfW
+        //   height = 2n * halfH
+        // To fully cover the screen (including corners), we need the diamond
+        // to be larger than the screen diagonal in both iso dimensions.
+        // Solve: 2n * halfW >= screenW AND 2n * halfH >= screenH
+        // But the diamond is rotated 45°, so corners of the screen may poke out.
+        // Over-provision by using the diagonal of the screen as the required coverage.
+        let diagonal = sqrt(screenW * screenW + screenH * screenH)
+        let nForWidth = Int(ceil(diagonal / tileW)) + 4
+        let nForHeight = Int(ceil(diagonal / tileH)) + 4
+        let gridSize = max(max(nForWidth, nForHeight), 20)
 
         engine = GameEngine(width: gridSize, height: gridSize)
         anims = Array(repeating: Array(repeating: CellAnim(), count: gridSize), count: gridSize)
 
-        // Center the grid (macOS Y-up: grid extends downward in -Y from origin)
-        let w = gridSize, h = gridSize
-        originX = bounds.midX - CGFloat(w - h) * halfW / 2
-        let visualHeight = CGFloat(w + h) * halfH + maxCubeH + halfH
+        // Center the grid on screen
+        originX = bounds.midX
+        let visualHeight = CGFloat(gridSize * 2) * halfH + maxCubeH
         originY = bounds.midY + visualHeight / 2
 
         // Sync initial engine state to animation
@@ -233,7 +247,7 @@ class GameOfLifeView: NSView {
 
         // Cube rises from below and grows to full height
         let cubeH = maxCubeH * max(eased, 0)
-        let riseOffset = (1.0 - t) * 40.0  // starts 40px below, rises to position (doubled for 2x size)
+        let riseOffset = (1.0 - t) * maxCubeH * 1.5  // starts below, rises to position
         let alpha = min(t * 2.5, 1.0)
 
         ctx.saveGState()
@@ -274,7 +288,7 @@ class GameOfLifeView: NSView {
             // Phase 2: Fall — cube drops away and fades
             let fallT = (t - 0.35) / 0.65
             let eased = easeInCubic(fallT)
-            let fallDist = eased * 120.0
+            let fallDist = eased * maxCubeH * 3.0
             let alpha = 1.0 - eased
             let shrink = 1.0 - eased * 0.4
             let cubeH = maxCubeH * shrink
@@ -341,7 +355,7 @@ class GameOfLifeView: NSView {
         // Subtle edge highlight on top face
         ctx.setStrokeColor(red: min(faces.topR + 0.15, 1), green: min(faces.topG + 0.15, 1),
                            blue: min(faces.topB + 0.15, 1), alpha: 0.4)
-        ctx.setLineWidth(0.8)
+        ctx.setLineWidth(max(tileW / 40.0, 0.5))
         ctx.beginPath()
         ctx.move(to: topW)
         ctx.addLine(to: topN)

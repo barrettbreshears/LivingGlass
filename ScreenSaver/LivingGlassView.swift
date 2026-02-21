@@ -21,7 +21,8 @@ class LivingGlassView: ScreenSaverView {
         wantsLayer = true
         layer?.backgroundColor = NSColor(hex: 0x121117).cgColor
 
-        let gv = GameOfLifeView(frame: bounds)
+        let saverBundle = Bundle(for: LivingGlassView.self)
+        let gv = GameOfLifeView(frame: bounds, bundle: saverBundle)
         gv.autoresizingMask = [.width, .height]
         addSubview(gv)
         gameView = gv

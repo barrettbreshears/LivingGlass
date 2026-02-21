@@ -49,9 +49,27 @@ class GameOfLifeView: NSView {
     // Bounce effect on space switch
     var bounceTime: CGFloat = -1  // <0 means no bounce active
 
+    // Bundle for loading resources (Metal shaders)
+    var resourceBundle: Bundle = Bundle.main
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         setup()
+    }
+
+    convenience init(frame: NSRect, bundle: Bundle) {
+        self.init(frame: frame)
+        // Re-init renderer with correct bundle if needed
+        if bundle != Bundle.main {
+            resourceBundle = bundle
+            renderer = MetalRenderer(mtkView: mtkView, bundle: bundle)
+            mtkView.delegate = renderer
+            if let renderer = renderer {
+                renderer.mtkView(mtkView, drawableSizeWillChange: mtkView.drawableSize)
+            }
+            renderer?.tileW = Float(tileW)
+            renderer?.tileH = Float(tileH)
+        }
     }
 
     required init?(coder: NSCoder) {

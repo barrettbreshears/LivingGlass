@@ -54,7 +54,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         )
     }
 
-    init?(mtkView: MTKView) {
+    init?(mtkView: MTKView, bundle: Bundle = Bundle.main) {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         self.device = device
         mtkView.device = device
@@ -63,11 +63,17 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         guard let queue = device.makeCommandQueue() else { return nil }
         self.commandQueue = queue
 
-        // Load shader library (try bundle first, then alongside executable)
+        // Load shader library (try provided bundle first, then main bundle)
         var library: MTLLibrary?
-        library = try? device.makeDefaultLibrary(bundle: Bundle.main)
-        if library == nil, let libURL = Bundle.main.url(forResource: "default", withExtension: "metallib") {
+        library = try? device.makeDefaultLibrary(bundle: bundle)
+        if library == nil, let libURL = bundle.url(forResource: "default", withExtension: "metallib") {
             library = try? device.makeLibrary(URL: libURL)
+        }
+        if library == nil && bundle != Bundle.main {
+            library = try? device.makeDefaultLibrary(bundle: Bundle.main)
+            if library == nil, let libURL = Bundle.main.url(forResource: "default", withExtension: "metallib") {
+                library = try? device.makeLibrary(URL: libURL)
+            }
         }
         guard let lib = library,
               let vertFunc = lib.makeFunction(name: "vertex_main"),

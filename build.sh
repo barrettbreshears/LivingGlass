@@ -77,6 +77,7 @@ swiftc \
     -module-name LivingGlass \
     Sources/GameEngine.swift \
     Sources/MetalRenderer.swift \
+    Sources/Preferences.swift \
     Sources/GameOfLifeView.swift \
     ScreenSaver/LivingGlassView.swift
 

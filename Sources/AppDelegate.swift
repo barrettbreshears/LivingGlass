@@ -73,13 +73,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createWindow(for screen: NSScreen) {
+        // Use zero rect initially, then set frame explicitly to avoid contentRect translation issues
         let window = NSWindow(
-            contentRect: screen.frame,
+            contentRect: .zero,
             styleMask: .borderless,
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
+
+        // Position window exactly on this screen
+        window.setFrame(screen.frame, display: false)
 
         // Sit at the desktop level (behind desktop icons and all windows)
         window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
@@ -92,7 +95,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.canHide = false
         window.animationBehavior = .none
 
-        let lifeView = GameOfLifeView(frame: screen.frame)
+        let lifeView = GameOfLifeView(frame: NSRect(origin: .zero, size: screen.frame.size))
         window.contentView = lifeView
 
         window.orderFront(nil)

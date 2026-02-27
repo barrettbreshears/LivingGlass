@@ -92,13 +92,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createWindow(for screen: NSScreen) {
+        // Use zero rect initially, then set frame explicitly to avoid contentRect translation issues
         let window = NSWindow(
-            contentRect: screen.frame,
+            contentRect: .zero,
             styleMask: .borderless,
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
+
+        // Position window exactly on this screen
+        window.setFrame(screen.frame, display: false)
 
         // Sit at the desktop level (behind desktop icons and all windows)
         window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
@@ -111,7 +114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.canHide = false
         window.animationBehavior = .none
 
-        let lifeView = GameOfLifeView(frame: screen.frame)
+        let lifeView = GameOfLifeView(frame: NSRect(origin: .zero, size: screen.frame.size))
         window.contentView = lifeView
 
         window.orderFront(nil)
@@ -119,11 +122,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func screensChanged() {
-        // Tear down and rebuild for new screen config
-        for w in windows {
-            w.close()
+        // Defer entire rebuild to next run loop to avoid modifying state during AppKit's display reconfiguration
+        DispatchQueue.main.async { [weak self] in
+            self?.rebuildWindows()
         }
-        windows.removeAll()
+    }
+    
+    private func rebuildWindows() {
+        // Stop all animations first
+        for w in windows {
+            if let view = w.contentView as? GameOfLifeView {
+                view.stop()
+            }
+        }
+        
+        // Close old windows
+        let oldWindows = windows
+        windows = []
+        for w in oldWindows {
+            w.orderOut(nil)
+        }
+        
+        // Create new windows for current screens
         for screen in NSScreen.screens {
             createWindow(for: screen)
         }

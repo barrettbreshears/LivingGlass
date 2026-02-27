@@ -36,6 +36,7 @@ class GameOfLifeView: NSView {
     let precomputeBatchSize = 1000
     let refillThreshold = 100
     var isPrecomputing = false
+    var isStopped = false
     let precomputeQueue = DispatchQueue(label: "com.taigrr.livingglass.precompute", qos: .utility)
 
     // Metal
@@ -104,7 +105,7 @@ class GameOfLifeView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        mtkView.frame = bounds
+        mtkView?.frame = bounds
     }
 
     // MARK: - Grid Setup
@@ -175,6 +176,7 @@ class GameOfLifeView: NSView {
     }
 
     private func renderFrame() {
+        guard !isStopped else { return }
         frameCount += 1
         globalTime += 1.0 / 60.0
 
@@ -264,12 +266,13 @@ class GameOfLifeView: NSView {
     }
 
     private func refillIfNeeded() {
-        guard diffQueue.count < refillThreshold && !isPrecomputing else { return }
+        guard diffQueue.count < refillThreshold && !isPrecomputing && !isStopped else { return }
         isPrecomputing = true
         precomputeQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, !self.isStopped else { return }
             let diffs = self.engine.precompute(steps: self.precomputeBatchSize)
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, !self.isStopped else { return }
                 self.diffQueue.append(contentsOf: diffs)
                 self.isPrecomputing = false
             }
@@ -527,7 +530,7 @@ class GameOfLifeView: NSView {
         }
 
         renderer.updateInstances(instances)
-        mtkView.draw()
+        mtkView?.draw()
     }
 
     // MARK: - Easing
@@ -570,6 +573,13 @@ class GameOfLifeView: NSView {
     func pause() {
         displayTimer?.invalidate()
         displayTimer = nil
+    }
+
+    func stop() {
+        isStopped = true
+        pause()
+        mtkView?.isPaused = true
+        mtkView?.delegate = nil
     }
 
     func resume() {

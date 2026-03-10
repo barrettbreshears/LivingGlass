@@ -55,8 +55,10 @@ class GameOfLifeView: NSView {
     var eqRangeMax: Float = 1
     var wasInAudioMode = false
 
+    #if LIVINGGLASS_APP
     // Audio visualizer (multi-layer effects engine)
     var visualizer: AudioVisualizer?
+    #endif
 
     // Bundle for loading resources (Metal shaders)
     var resourceBundle: Bundle = Bundle.main
@@ -182,6 +184,7 @@ class GameOfLifeView: NSView {
 
         let audioMode = isAudioMode
         if audioMode {
+            #if LIVINGGLASS_APP
             if !wasInAudioMode {
                 wasInAudioMode = true
                 enterAudioMode()
@@ -191,10 +194,13 @@ class GameOfLifeView: NSView {
             let audio = currentAudioLevels
             visualizer?.update(audio: audio, time: Float(globalTime), dt: dt,
                                eqMin: eqRangeMin, eqMax: eqRangeMax)
+            #endif
         } else {
             if wasInAudioMode {
                 wasInAudioMode = false
+                #if LIVINGGLASS_APP
                 visualizer = nil
+                #endif
                 initGrid()  // rebuild with normal tile size
             }
             if frameCount % gameTickEvery == 0 {
@@ -207,6 +213,7 @@ class GameOfLifeView: NSView {
         buildAndRender()
     }
 
+    #if LIVINGGLASS_APP
     /// Transition into audio mode: rebuild grid with bigger tiles, create visualizer.
     private func enterAudioMode() {
         // Rebuild grid with larger tiles for audio mode
@@ -224,7 +231,7 @@ class GameOfLifeView: NSView {
 
         for x in 0..<w {
             for y in 0..<h {
-                // Base color from frequency position + random scatter for variety
+                // Map x-y screen position to EQ band position, then add small scatter.
                 let eqRange = eqRangeMax - eqRangeMin
                 let eqPos = eqRange > 0 ? (Float(x - y) - eqRangeMin) / eqRange : 0.5
                 let baseIdx = Int(eqPos * Float(paletteCount - 1))
@@ -247,6 +254,7 @@ class GameOfLifeView: NSView {
             }
         }
     }
+    #endif
 
     private func applyNextDiff() {
         guard !diffQueue.isEmpty else { return }
@@ -384,6 +392,7 @@ class GameOfLifeView: NSView {
 
                 case .alive:
                     if audioMode {
+                        #if LIVINGGLASS_APP
                         // === AUDIO VISUALIZER MODE ===
                         let vizH = visualizer?.height(atX: x, y: y) ?? 0
 
@@ -427,6 +436,7 @@ class GameOfLifeView: NSView {
                             leftColor: SIMD4<Float>(SIMD3<Float>(lr, lg, lb), depth),
                             rightColor: SIMD4<Float>(SIMD3<Float>(rr, rg, rb), 0)
                         ))
+                        #endif
                     } else {
                         // === GAME OF LIFE MODE ===
                         let eqRange = eqRangeMax - eqRangeMin

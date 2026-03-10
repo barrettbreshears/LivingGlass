@@ -53,15 +53,25 @@ struct AudioLevels {
 class ColorManager {
     static let shared = ColorManager()
 
-    private(set) var faceColors: [FaceRGB]
+    private let faceColorsLock = NSLock()
+    private var _faceColors: [FaceRGB]
     private let basePalette: [NSColor] = GameEngine.palette
 
+    var faceColors: [FaceRGB] {
+        faceColorsLock.lock()
+        defer { faceColorsLock.unlock() }
+        return _faceColors
+    }
+
     private init() {
-        faceColors = ColorManager.computeFaceColors(from: GameEngine.palette, tint: .identity)
+        _faceColors = ColorManager.computeFaceColors(from: GameEngine.palette, tint: .identity)
     }
 
     func applyTint(_ tint: ColorTint) {
-        faceColors = ColorManager.computeFaceColors(from: basePalette, tint: tint)
+        let updated = ColorManager.computeFaceColors(from: basePalette, tint: tint)
+        faceColorsLock.lock()
+        _faceColors = updated
+        faceColorsLock.unlock()
     }
 
     static func computeFaceColors(from palette: [NSColor], tint: ColorTint) -> [FaceRGB] {

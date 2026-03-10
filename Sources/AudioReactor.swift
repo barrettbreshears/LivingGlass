@@ -6,6 +6,9 @@ import CoreMedia
 
 class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
     static let shared = AudioReactor()
+    private static let fftSize = 1024
+    private static let halfFFT = fftSize / 2
+    private static let log2FFTSize = vDSP_Length(log2f(Float(fftSize)))
 
     private var stream: SCStream?
     private let lock = NSLock()
@@ -22,8 +25,13 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
     private var smoothedMid: Float = 0
     private var smoothedHigh: Float = 0
 
+    private var fftSetup: FFTSetup?
+    private var fftWindow = [Float](repeating: 0, count: AudioReactor.fftSize)
+
+    #if DEBUG
     // Debug: count audio callbacks to verify capture is working
     private var callbackCount: Int = 0
+    #endif
 
     // Attack/release coefficients (per-callback, ~100 callbacks/sec at 48kHz/480 frames)
     private let attack: Float = 0.6    // snap up quickly
@@ -59,7 +67,15 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     private override init() {
+        fftSetup = vDSP_create_fftsetup(AudioReactor.log2FFTSize, FFTRadix(kFFTRadix2))
+        vDSP_hann_window(&fftWindow, vDSP_Length(AudioReactor.fftSize), Int32(vDSP_HANN_NORM))
         super.init()
+    }
+
+    deinit {
+        if let fftSetup {
+            vDSP_destroy_fftsetup(fftSetup)
+        }
     }
 
     /// Start capturing system audio. Retries once after 2s on failure.
@@ -183,6 +199,7 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
 
         analyzeAudio(mono, frameCount: frameCount, sampleRate: 48000.0)
 
+        #if DEBUG
         // Log audio levels every ~2 seconds for debugging
         callbackCount += 1
         if callbackCount % 200 == 0 {
@@ -192,6 +209,7 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
                   lvl.bands[0], lvl.bands[4], lvl.bands[8], lvl.bands[12],
                   lvl.bands[16], lvl.bands[20], lvl.bands[24], lvl.bands[28])
         }
+        #endif
     }
 
     // MARK: - SCStreamDelegate
@@ -218,8 +236,8 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func analyzeAudio(_ samples: [Float], frameCount: Int, sampleRate: Float) {
         let sensitivity = sensitivityMultiplier
-        let fftSize = 1024
-        let halfFFT = fftSize / 2
+        let fftSize = AudioReactor.fftSize
+        let halfFFT = AudioReactor.halfFFT
         let sampleCount = min(frameCount, fftSize)
 
         // RMS
@@ -238,10 +256,8 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
 
         // Window the signal
         var windowed = [Float](repeating: 0, count: fftSize)
-        var window = [Float](repeating: 0, count: fftSize)
-        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
         samples.withUnsafeBufferPointer { buf in
-            vDSP_vmul(buf.baseAddress!, 1, window, 1, &windowed, 1, vDSP_Length(sampleCount))
+            vDSP_vmul(buf.baseAddress!, 1, fftWindow, 1, &windowed, 1, vDSP_Length(sampleCount))
         }
 
         // FFT
@@ -266,10 +282,8 @@ class AudioReactor: NSObject, SCStreamOutput, SCStreamDelegate {
                     }
                 }
 
-                if let fftSetup = vDSP_create_fftsetup(vDSP_Length(log2f(Float(fftSize))), FFTRadix(kFFTRadix2)) {
-                    vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(log2f(Float(fftSize))), FFTDirection(FFT_FORWARD))
-                    vDSP_destroy_fftsetup(fftSetup)
-                }
+                guard let fftSetup = fftSetup else { return }
+                vDSP_fft_zrip(fftSetup, &splitComplex, 1, AudioReactor.log2FFTSize, FFTDirection(FFT_FORWARD))
 
                 var magnitudes = [Float](repeating: 0, count: halfFFT)
                 vDSP_zvmags(&splitComplex, 1, &magnitudes, 1, vDSP_Length(halfFFT))

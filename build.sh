@@ -90,9 +90,7 @@ swiftc \
     Sources/GameEngine.swift \
     Sources/ColorManager.swift \
     Sources/MetalRenderer.swift \
-    Sources/AudioVisualizer.swift \
     Sources/Preferences.swift \
-    Sources/DayNightTheme.swift \
     Sources/GameOfLifeView.swift \
     ScreenSaver/LivingGlassView.swift
 
